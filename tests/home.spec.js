@@ -44,8 +44,8 @@ test.describe('Home is a way in, not a feed', () => {
   });
 });
 
-test.describe('My Agenda is a blank canvas', () => {
-  test('it says it is coming soon, and is still in the nav', async ({ page }, testInfo) => {
+test.describe('My Agenda is in the nav', () => {
+  test('it is in the nav, and /my-plan redirects to it', async ({ page }, testInfo) => {
     await visit(page, '/');
     // Desktop shows the main nav; a phone hides it behind the menu button.
     if (testInfo.project.name === 'mobile') {
@@ -55,10 +55,10 @@ test.describe('My Agenda is a blank canvas', () => {
       await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: /My Agenda/ }).click();
     }
     await expect(page).toHaveURL(/\/my-agenda$/);
-    await expect(page.getByTestId('agenda-coming-soon')).toContainText('Coming soon');
+    await expect(page.getByRole('heading', { name: 'My Agenda' })).toBeVisible();
 
     await visit(page, '/my-plan');
     await expect(page).toHaveURL(/\/my-agenda$/);
-    await expect(page.getByTestId('agenda-coming-soon')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'My Agenda' })).toBeVisible();
   });
 });
