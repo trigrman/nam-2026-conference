@@ -51,6 +51,25 @@ test.describe('My Agenda', () => {
       expect(waitlisted).toBeGreaterThanOrEqual(bDuration);
       expect(booked).toBeGreaterThanOrEqual(aDuration);
 
+      // every row says Seated or Waitlisted, matching the reservation
+      await expect(row(a).getByTestId('agenda-status')).toHaveText('Seated');
+      await expect(row(b).getByTestId('agenda-status')).toHaveText('Waitlisted');
+      await expect(page.getByTestId('agenda-promoted')).toHaveCount(0);
+
+      // a place that was queued when I last looked and is a seat now is flagged once.
+      // (Another attendee's release is what promotes in life; here the remembered
+      // state is set to what it would have been, so no shared session is disturbed.)
+      const seenKey = `orbit:agendaSeen:${user}`;
+      await page.evaluate(([k, id]) => localStorage.setItem(k, JSON.stringify({ [id]: 'waitlisted' })), [seenKey, a.id]);
+      await page.reload();
+      await expect(row(a).getByTestId('agenda-promoted')).toHaveText('You got a seat');
+      await expect(row(a).getByTestId('agenda-status')).toHaveText('Seated');
+      await expect(page.getByTestId('agenda-promoted')).toHaveCount(1);
+      await shotForPR(page, 'you got a seat on my agenda');
+      await page.reload();
+      await expect(row(a).getByTestId('agenda-status')).toHaveText('Seated');
+      await expect(page.getByTestId('agenda-promoted')).toHaveCount(0);
+
       // before the doors open: no check-in, and waitlist places never get one
       await expect(row(a).getByTestId('check-in')).toHaveCount(0);
       await expect(row(b).getByTestId('attendance-panel')).toHaveCount(0);
