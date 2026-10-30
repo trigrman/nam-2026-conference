@@ -37,6 +37,64 @@ test.describe('Schedule', () => {
     await expect(page.getByTestId('result-count')).not.toHaveText(first);
   });
 
+  test('track pills toggle: several at once, counts match the API, URL survives a reload', async ({ page }) => {
+    const days = await conferenceDays();
+    const day = days[1];
+    const boot = await (await fetch(`${API}/bootstrap`)).json();
+    const count = async (slugs) => (await (await fetch(`${API}/sessions?day=${day}${slugs ? `&trackSlug=${slugs}` : ''}`)).json());
+    const withSessions = [];
+    for (const t of boot.tracks) if ((await count(t.slug)).length > 0) withSessions.push(t);
+    const [a, b] = withSessions;
+    const name = (t) => t.shortName ?? t.name;
+    const pill = (t) => page.getByRole('button', { name: name(t), exact: true });
+    const all = page.getByRole('button', { name: 'All', exact: true });
+    const total = page.getByTestId('result-count');
+    const expectCount = async (slugs) => {
+      const n = (await count(slugs)).length;
+      await expect(total).toContainText(new RegExp(`^${n} sessions?\\b`));
+    };
+
+    await visit(page, `/schedule?view=list&day=${day}`);
+    await waitForResults(page);
+    const filtersBtn = page.getByRole('button', { name: /^Filters/ });
+    if (await filtersBtn.isVisible()) await filtersBtn.click();
+    await expect(all).toHaveAttribute('aria-pressed', 'true');
+    await expect(pill(a)).toHaveAttribute('aria-pressed', 'false');
+
+    await pill(a).click();
+    await expect(pill(a)).toHaveAttribute('aria-pressed', 'true');
+    await expectCount(a.slug);
+    await pill(b).click();
+    await expect(pill(b)).toHaveAttribute('aria-pressed', 'true');
+    await expect(pill(a)).toHaveAttribute('aria-pressed', 'true');
+    await expect(all).toHaveAttribute('aria-pressed', 'false');
+    await expectCount(`${a.slug},${b.slug}`);
+    await expect(page).toHaveURL(new RegExp(`track=${a.slug}(%2C|,)${b.slug}`));
+    await shotForPR(page, 'two track pills selected, sessions of both tracks listed');
+
+    await page.reload();
+    if (await filtersBtn.isVisible()) await filtersBtn.click();
+    await expect(pill(a)).toHaveAttribute('aria-pressed', 'true');
+    await expect(pill(b)).toHaveAttribute('aria-pressed', 'true');
+    await expectCount(`${a.slug},${b.slug}`);
+
+    await pill(a).click();
+    await expect(pill(a)).toHaveAttribute('aria-pressed', 'false');
+    await expectCount(b.slug);
+
+    await pill(b).click();
+    await expect(page).not.toHaveURL(/track=/);
+    await expect(all).toHaveAttribute('aria-pressed', 'true');
+    await expectCount('');
+
+    await pill(a).click();
+    await pill(b).click();
+    await all.click();
+    await expect(page).not.toHaveURL(/track=/);
+    await expect(pill(a)).toHaveAttribute('aria-pressed', 'false');
+    await expectCount('');
+  });
+
   test('search narrows the list and survives a reload', async ({ page }) => {
     await visit(page, '/schedule?view=list');
     await waitForResults(page);
