@@ -28,3 +28,18 @@ export function hoursLabel(minutes) {
   if (!h && !m) return '0h';
   return [h && `${h}h`, m && `${m}m`].filter(Boolean).join(' ');
 }
+
+/** `{ [sessionId]: 'confirmed' | 'waitlisted' }` for every session on the agenda — the snapshot of what I last saw. */
+export function statusMap(days) {
+  return Object.fromEntries((days ?? []).flatMap((d) => d.sessions.map((s) => [s.id, s.reservation])));
+}
+
+/**
+ * Ids that were waitlisted in `seen` (a `statusMap`, or null on a first visit)
+ * and are confirmed now: a place that became a seat while I was away. A seat I
+ * took myself was never waitlisted, so it never counts.
+ */
+export function promotedSince(seen, sessions) {
+  if (!seen) return [];
+  return (sessions ?? []).filter((s) => s.reservation === 'confirmed' && seen[s.id] === 'waitlisted').map((s) => s.id);
+}

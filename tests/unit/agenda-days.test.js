@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { agendaDays, hoursLabel } from '../../src/lib/agendaDays.js';
+import { agendaDays, hoursLabel, promotedSince, statusMap } from '../../src/lib/agendaDays.js';
 
 const s = (id, startsAt, endsAt) => ({ id, startsAt, endsAt });
 const payload = [
@@ -41,5 +41,31 @@ describe('hoursLabel', () => {
     assert.equal(hoursLabel(45), '45m');
     assert.equal(hoursLabel(120), '2h');
     assert.equal(hoursLabel(135), '2h 15m');
+  });
+});
+
+describe('promotedSince', () => {
+  const now = [{ id: 1, reservation: 'confirmed' }, { id: 2, reservation: 'waitlisted' }, { id: 3, reservation: 'confirmed' }];
+
+  test('a waitlist place that is now a seat is promoted', () => {
+    assert.deepEqual(promotedSince({ 1: 'waitlisted' }, now), [1]);
+  });
+
+  test('still queued, already seated, or taken by me since: not promoted', () => {
+    assert.deepEqual(promotedSince({ 1: 'confirmed', 2: 'waitlisted' }, now), []);
+  });
+
+  test('a first visit has nothing to compare, so nothing is promoted', () => {
+    assert.deepEqual(promotedSince(null, now), []);
+    assert.deepEqual(promotedSince(undefined, undefined), []);
+  });
+
+  test('once the snapshot is refreshed the highlight is gone', () => {
+    const seen = { 1: 'waitlisted' };
+    assert.deepEqual(promotedSince(seen, now), [1]);
+    const days = agendaDays([{ date: 'd', sessions: [s(1, '09:00', '10:00'), s(2, '10:15', '11:00')] }], store({ 1: 'confirmed', 2: 'waitlisted' }));
+    const next = statusMap(days);
+    assert.deepEqual(next, { 1: 'confirmed', 2: 'waitlisted' });
+    assert.deepEqual(promotedSince(next, now), []);
   });
 });
