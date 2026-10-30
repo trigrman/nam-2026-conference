@@ -137,6 +137,9 @@ export const LANES = {
   // one, checked into and rated for real (so day 0, and a fresh seed per run). Both
   // attendees hold nothing in these slots in the seed and no other pane pins them.
   'agenda.page':      { desktop: { user: marcus, day: 0, slot: '16:00' },  mobile: { user: abraham, day: 0, slot: '11:30' } },
+  // Books two sessions in consecutive slots (one pair across venues, one within), whichever
+  // the seed leaves free; no other lane uses these attendees on day 1.
+  'agenda.travel':    { desktop: { user: andy, day: 1 },                   mobile: { user: jonas, day: 1 } },
   'agenda.page-late': { desktop: { user: marcus, day: 0, slot: '17:15' },  mobile: { user: abraham, day: 0, slot: '17:15' } },
 };
 
