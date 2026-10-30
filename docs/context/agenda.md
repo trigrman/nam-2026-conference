@@ -28,7 +28,9 @@ store, sorts, and recomputes `totalMinutes` (confirmed) / `waitlistedMinutes`;
 `SessionCard variant="row"` plus venue and speaker names, a Remove button
 (`agenda-remove`, the store's `releaseSeat`) and, for a confirmed seat once check-in has
 opened, `AttendancePanel` (check-in / rating rules stay in the attendance doc).
-Waitlist places get Remove only. Every row has a status chip (`agenda-status`, Seated or
+A waitlisted row also shows `agenda-backups`: each `agenda-backup` (title, time, room, seats left) has
+`agenda-backup-add` (the store's `reserveSeat`, then the fetch's `reload()`); hidden once the queued
+session has ended, or a backup is held in any status or over. Every row has a status chip (`agenda-status`, Seated or
 Waitlisted). The page remembers each attendee's last-seen statuses in `localStorage`
 `orbit:agendaSeen:<userId>` (`statusMap`); on load, `promotedSince(seen, sessions)` returns
 ids that were waitlisted then and are confirmed now, and those rows show `agenda-promoted`
@@ -92,7 +94,9 @@ top 8 topic-tag slugs by count across *all* their reservations (any day, either
 status). Candidates are `openInSlot`: same day and start, `is_keynote = 0`,
 `format != 'Social'`, `seats_taken < capacity`. Each gets `affinity` = number of
 its topic tags in that set; sort `affinity` desc then `avgRating` desc; top
-`SUGGESTION_COUNT` (3). `users.interests` is never read here.
+`SUGGESTION_COUNT` (3). `users.interests` is never read here. An optional `exclude` id set
+is filtered out first: `scheduleFor` puts `backups` on each *waitlisted* session
+(`suggestionsFor(user, day, startsAt, every id held)`); seated sessions have no `backups` key.
 
 **Speaker data.** `GET /api/users/:id` adds `speaker` and `speakingSessions`
 (`users.js:speakingSessions`, via `presenting` + plain `toSession`, so no

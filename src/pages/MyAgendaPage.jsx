@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { useConference, useFetch } from '../lib/store.jsx';
 import * as api from '../lib/api.js';
-import { toMinutes } from '../lib/clock.js';
+import { hasEnded, toMinutes } from '../lib/clock.js';
 import { dayLabel } from '../lib/format.js';
 import { agendaDays, hoursLabel, promotedSince, statusMap, travelWarnings } from '../lib/agendaDays.js';
 import { Button, SectionHeader, Stat } from '../components/ui.jsx';
@@ -11,13 +11,21 @@ import { SessionCard } from '../components/SessionCard.jsx';
 import { AttendancePanel } from '../components/AttendancePanel.jsx';
 
 /** One session on the agenda: the row, who is speaking, Remove, and — once the doors open — check-in and rating. */
-function AgendaSession({ session, promoted }) {
-  const { clock, releaseSeat } = useConference();
+function AgendaSession({ session, promoted, onAdded }) {
+  const { clock, releaseSeat, reserveSeat, reservationFor } = useConference();
   const confirmed = session.reservation === 'confirmed';
   // Same test as the row's own status line: nothing before check-in opens, 15 minutes ahead.
   const open = clock.day > session.day ||
     (clock.day === session.day && toMinutes(clock.time) >= toMinutes(session.startsAt) - 15);
   const speakers = session.speakers ?? [];
+  // Backups for a queued place: not once it is over, and never one I now hold in any status.
+  const backups = confirmed || hasEnded(session, clock)
+    ? []
+    : (session.backups ?? []).filter((b) => !reservationFor(b.id) && !hasEnded(b, clock));
+  const addBackup = async (b) => {
+    const state = await reserveSeat(b.id);
+    if (state?.status) onAdded();
+  };
 
   return (
     <li className="space-y-2" data-testid="agenda-session">
@@ -49,6 +57,25 @@ function AgendaSession({ session, promoted }) {
           Remove
         </Button>
       </div>
+      {backups.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-hairline bg-surface px-3 py-2" data-testid="agenda-backups">
+          <p className="text-[12px] font-medium text-muted">Backup sessions in this slot</p>
+          <ul className="space-y-2">
+            {backups.map((b) => (
+              <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 text-[13px]" data-testid="agenda-backup">
+                <span>
+                  <span className="font-medium">{b.title}</span>
+                  <span className="text-muted"> · {b.startsAt} · {b.room.name} · {b.seatsLeft} seats left</span>
+                </span>
+                <Button size="sm" onClick={() => addBackup(b)} data-testid="agenda-backup-add"
+                  aria-label={`Add ${b.title}`}>
+                  Add
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {confirmed && open && <AttendancePanel session={session} />}
     </li>
   );
@@ -57,7 +84,7 @@ function AgendaSession({ session, promoted }) {
 export function MyAgendaPage() {
   useDocumentTitle('My Agenda');
   const { currentUserId, reservationFor, travel } = useConference();
-  const { data, loading, error } = useFetch(() => api.getSchedule(currentUserId), [currentUserId]);
+  const { data, loading, error, reload } = useFetch(() => api.getSchedule(currentUserId), [currentUserId]);
   const days = agendaDays(data?.days, reservationFor);
   // Seats only: a waitlist place may never come good, so it neither raises nor hides a warning.
   const warnings = (d) => travelWarnings(d.sessions.filter((s) => s.reservation === 'confirmed'), travel ?? []);
@@ -113,7 +140,7 @@ export function MyAgendaPage() {
               const warn = warnings(d)[s.id];
               return (
                 <Fragment key={s.id}>
-                  <AgendaSession session={s} promoted={promoted.includes(s.id)} />
+                  <AgendaSession session={s} promoted={promoted.includes(s.id)} onAdded={reload} />
                   {warn && (
                     <li data-testid="agenda-travel-warning"
                       className="rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-3 py-2 text-[13px] text-amber-200">

@@ -48,6 +48,41 @@ describe('A day on the schedule', () => {
   });
 });
 
+describe('Backups for a waitlisted place', () => {
+  test('a queued session lists up to three open sessions in its slot; a seated one lists none', async () => {
+    const user = 6;
+    await clearAgenda(api, user);
+
+    const sessions = await api.json('/sessions');
+    const queue = sessions.find((s) => s.isFull && !s.isKeynote && s.format !== 'Social');
+    assert.ok(queue, 'the seed should sell out a session');
+    const seat = sessions.find((s) => !s.isFull && s.seatsLeft > 2 && !s.isKeynote && s.format !== 'Social' && !overlaps(s, queue));
+    assert.ok(seat, 'the seed should leave an open session clear of the queued one');
+
+    assert.equal((await api.put(`/users/${user}/reservations/${seat.id}`, {})).body.status, 'confirmed');
+    assert.equal((await api.put(`/users/${user}/reservations/${queue.id}`, {})).body.status, 'waitlisted');
+
+    const { days } = await api.json(`/users/${user}/schedule`);
+    const held = new Map(days.flatMap((d) => d.sessions).map((s) => [s.id, s]));
+
+    const backups = held.get(queue.id).backups;
+    assert.ok(Array.isArray(backups) && backups.length > 0, 'a waitlisted place should get backups');
+    assert.ok(backups.length <= 3);
+    for (const b of backups) {
+      assert.equal(b.day, queue.day);
+      assert.equal(b.startsAt, queue.startsAt);
+      assert.ok(b.seatsLeft > 0 && !b.isFull, 'a full session is never suggested');
+      assert.ok(!held.has(b.id), 'nothing already held is offered');
+    }
+
+    assert.equal(held.get(seat.id).backups, undefined, 'a seated session carries no backups');
+
+    // adding one takes a seat in it
+    const added = await api.put(`/users/${user}/reservations/${backups[0].id}`, {});
+    assert.equal(added.body.status, 'confirmed');
+  });
+});
+
 describe('Attendance on the schedule', () => {
   /*
    * My Agenda marks every session that is over as rated, checked in or

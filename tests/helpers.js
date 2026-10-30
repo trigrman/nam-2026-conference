@@ -141,6 +141,8 @@ export const LANES = {
   // the seed leaves free; no other lane uses these attendees on day 1.
   'agenda.travel':    { desktop: { user: andy, day: 1 },                   mobile: { user: jonas, day: 1 } },
   'agenda.page-late': { desktop: { user: marcus, day: 0, slot: '17:15' },  mobile: { user: abraham, day: 0, slot: '17:15' } },
+  // Backups for a queued place: queues one full session, then adds a backup. Day 1, the day the seed sells out; Abraham there is free, and Kenji only has a read-only pane.
+  'agenda.backup':    { desktop: { user: abraham, day: 1 }, mobile: { user: kenji, day: 1 } },
 };
 
 /**
