@@ -133,6 +133,11 @@ export const LANES = {
   // Rates for real, so it must land on day index 0 — `today` — per
   // smoke.spec.js's "no session in the future carries a rating".
   'attendance.rating-toast':  { desktop: { user: marcus, day: 0, slot: '09:00', agenda: false }, mobile: { user: abraham, day: 0, slot: '09:00', agenda: false } },
+  // My Agenda: one confirmed seat in `agenda.page`'s slot, one waitlist place in the late
+  // one, checked into and rated for real (so day 0, and a fresh seed per run). Both
+  // attendees hold nothing in these slots in the seed and no other pane pins them.
+  'agenda.page':      { desktop: { user: marcus, day: 0, slot: '16:00' },  mobile: { user: abraham, day: 0, slot: '11:30' } },
+  'agenda.page-late': { desktop: { user: marcus, day: 0, slot: '17:15' },  mobile: { user: abraham, day: 0, slot: '17:15' } },
 };
 
 /**
