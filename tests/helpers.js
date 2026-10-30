@@ -137,9 +137,12 @@ export const LANES = {
   // one, checked into and rated for real (so day 0, and a fresh seed per run). Both
   // attendees hold nothing in these slots in the seed and no other pane pins them.
   'agenda.page':      { desktop: { user: marcus, day: 0, slot: '16:00' },  mobile: { user: abraham, day: 0, slot: '11:30' } },
+  // Books two sessions in consecutive slots (one pair across venues, one within), whichever
+  // the seed leaves free; no other lane uses these attendees on day 1.
+  'agenda.travel':    { desktop: { user: andy, day: 1 },                   mobile: { user: jonas, day: 1 } },
   'agenda.page-late': { desktop: { user: marcus, day: 0, slot: '17:15' },  mobile: { user: abraham, day: 0, slot: '17:15' } },
-  // Backups for a queued place: queues one full session, then adds a backup. Day 1, which no other lane gives these attendees.
-  'agenda.backup':    { desktop: { user: jonas, day: 1 },  mobile: { user: andy, day: 1 } },
+  // Backups for a queued place: queues one full session, then adds a backup. Day 1, the day the seed sells out; Abraham there is free, and Kenji only has a read-only pane.
+  'agenda.backup':    { desktop: { user: abraham, day: 1 }, mobile: { user: kenji, day: 1 } },
 };
 
 /**

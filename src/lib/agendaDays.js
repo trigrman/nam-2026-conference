@@ -1,4 +1,5 @@
 import { toMinutes } from './clock.js';
+import { assessTravel } from './travel.js';
 
 const minutesOf = (s) => toMinutes(s.endsAt) - toMinutes(s.startsAt);
 
@@ -42,4 +43,20 @@ export function statusMap(days) {
 export function promotedSince(seen, sessions) {
   if (!seen) return [];
   return (sessions ?? []).filter((s) => s.reservation === 'confirmed' && seen[s.id] === 'waitlisted').map((s) => s.id);
+}
+
+/**
+ * `{ [sessionId]: assessment }` for each session whose successor, in the same
+ * day's `sessions`, is at another venue and cannot be reached in the gap by any
+ * mode. Keyed by the earlier session, which the warning sits under.
+ */
+export function travelWarnings(sessions, travel) {
+  const ordered = [...sessions].sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.id - b.id);
+  const out = {};
+  ordered.slice(0, -1).forEach((from, i) => {
+    const to = ordered[i + 1];
+    const a = assessTravel({ travel, from, to, gapMinutes: toMinutes(to.startsAt) - toMinutes(from.endsAt) });
+    if (a?.impossible) out[from.id] = { ...a, from, to };
+  });
+  return out;
 }

@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { useConference, useFetch } from '../lib/store.jsx';
 import * as api from '../lib/api.js';
 import { hasEnded, toMinutes } from '../lib/clock.js';
 import { dayLabel } from '../lib/format.js';
-import { agendaDays, hoursLabel, promotedSince, statusMap } from '../lib/agendaDays.js';
+import { agendaDays, hoursLabel, promotedSince, statusMap, travelWarnings } from '../lib/agendaDays.js';
 import { Button, SectionHeader, Stat } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { SessionCard } from '../components/SessionCard.jsx';
@@ -83,9 +83,11 @@ function AgendaSession({ session, promoted, onAdded }) {
 
 export function MyAgendaPage() {
   useDocumentTitle('My Agenda');
-  const { currentUserId, reservationFor } = useConference();
+  const { currentUserId, reservationFor, travel } = useConference();
   const { data, loading, error, reload } = useFetch(() => api.getSchedule(currentUserId), [currentUserId]);
   const days = agendaDays(data?.days, reservationFor);
+  // Seats only: a waitlist place may never come good, so it neither raises nor hides a warning.
+  const warnings = (d) => travelWarnings(d.sessions.filter((s) => s.reservation === 'confirmed'), travel ?? []);
 
   // What I last saw, remembered per attendee in this browser: a place that was
   // queued then and is a seat now is flagged for this visit, and the snapshot is
@@ -134,7 +136,20 @@ export function MyAgendaPage() {
             </div>
           </div>
           <ul className="space-y-3">
-            {d.sessions.map((s) => <AgendaSession key={s.id} session={s} promoted={promoted.includes(s.id)} onAdded={reload} />)}
+            {d.sessions.map((s) => {
+              const warn = warnings(d)[s.id];
+              return (
+                <Fragment key={s.id}>
+                  <AgendaSession session={s} promoted={promoted.includes(s.id)} onAdded={reload} />
+                  {warn && (
+                    <li data-testid="agenda-travel-warning"
+                      className="rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-3 py-2 text-[13px] text-amber-200">
+                      {warn.from.venue.name} to {warn.to.venue.name} takes {warn.fastest.total} min, you have {warn.gapMinutes}
+                    </li>
+                  )}
+                </Fragment>
+              );
+            })}
           </ul>
         </section>
       ))}
