@@ -28,7 +28,12 @@ store, sorts, and recomputes `totalMinutes` (confirmed) / `waitlistedMinutes`;
 `SessionCard variant="row"` plus venue and speaker names, a Remove button
 (`agenda-remove`, the store's `releaseSeat`) and, for a confirmed seat once check-in has
 opened, `AttendancePanel` (check-in / rating rules stay in the attendance doc).
-Waitlist places get Remove only. Test ids: `agenda-day`, `agenda-booked-hours`,
+Waitlist places get Remove only. Every row has a status chip (`agenda-status`, Seated or
+Waitlisted). The page remembers each attendee's last-seen statuses in `localStorage`
+`orbit:agendaSeen:<userId>` (`statusMap`); on load, `promotedSince(seen, sessions)` returns
+ids that were waitlisted then and are confirmed now, and those rows show `agenda-promoted`
+("You got a seat") for that visit only, since the snapshot is rewritten at once. No
+snapshot (first visit, other browser) highlights nothing. Test ids: `agenda-day`, `agenda-booked-hours`,
 `agenda-waitlisted-hours` (only when queued time exists), `agenda-empty`
 (nothing held on any day; links to `/schedule`). Still unbuilt: followed speakers,
 suggestions and `/today` on this page. Everything below is served by the API.

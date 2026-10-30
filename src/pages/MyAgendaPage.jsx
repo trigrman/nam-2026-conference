@@ -1,16 +1,17 @@
+import { useEffect, useRef, useState } from 'react';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { useConference, useFetch } from '../lib/store.jsx';
 import * as api from '../lib/api.js';
 import { toMinutes } from '../lib/clock.js';
 import { dayLabel } from '../lib/format.js';
-import { agendaDays, hoursLabel } from '../lib/agendaDays.js';
+import { agendaDays, hoursLabel, promotedSince, statusMap } from '../lib/agendaDays.js';
 import { Button, SectionHeader, Stat } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { SessionCard } from '../components/SessionCard.jsx';
 import { AttendancePanel } from '../components/AttendancePanel.jsx';
 
 /** One session on the agenda: the row, who is speaking, Remove, and — once the doors open — check-in and rating. */
-function AgendaSession({ session }) {
+function AgendaSession({ session, promoted }) {
   const { clock, releaseSeat } = useConference();
   const confirmed = session.reservation === 'confirmed';
   // Same test as the row's own status line: nothing before check-in opens, 15 minutes ahead.
@@ -31,6 +32,15 @@ function AgendaSession({ session }) {
       />
       <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[12px] text-muted">
         <span>
+          <span data-testid="agenda-status" className={confirmed ? 'font-medium text-emerald-300' : 'font-medium text-amber-300'}>
+            {confirmed ? 'Seated' : 'Waitlisted'}
+          </span>
+          {promoted && (
+            <span data-testid="agenda-promoted" className="ml-2 rounded-full bg-emerald-500/15 px-2 py-0.5 font-medium text-emerald-300">
+              You got a seat
+            </span>
+          )}
+          {' · '}
           {session.venue.name}
           {speakers.length > 0 && <> · {speakers.map((s) => s.name).join(', ')}</>}
         </span>
@@ -49,6 +59,22 @@ export function MyAgendaPage() {
   const { currentUserId, reservationFor } = useConference();
   const { data, loading, error } = useFetch(() => api.getSchedule(currentUserId), [currentUserId]);
   const days = agendaDays(data?.days, reservationFor);
+
+  // What I last saw, remembered per attendee in this browser: a place that was
+  // queued then and is a seat now is flagged for this visit, and the snapshot is
+  // refreshed so the next visit shows an ordinary row. Once per load, and only
+  // after the store knows my reservations (they start empty).
+  const [promoted, setPromoted] = useState([]);
+  const handled = useRef(null);
+  useEffect(() => {
+    if (!data || !days.length || handled.current === data) return;
+    handled.current = data;
+    const key = `orbit:agendaSeen:${currentUserId}`;
+    let seen = null;
+    try { seen = JSON.parse(localStorage.getItem(key)); } catch { /* unreadable: treat as a first visit */ }
+    setPromoted(promotedSince(seen, days.flatMap((d) => d.sessions)));
+    try { localStorage.setItem(key, JSON.stringify(statusMap(days))); } catch { /* storage full or blocked */ }
+  });
 
   return (
     <div className="space-y-8">
@@ -81,7 +107,7 @@ export function MyAgendaPage() {
             </div>
           </div>
           <ul className="space-y-3">
-            {d.sessions.map((s) => <AgendaSession key={s.id} session={s} />)}
+            {d.sessions.map((s) => <AgendaSession key={s.id} session={s} promoted={promoted.includes(s.id)} />)}
           </ul>
         </section>
       ))}
