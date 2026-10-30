@@ -119,4 +119,43 @@ test.describe('My Agenda', () => {
       await request.delete(`${API}/users/${user}/reservations/${b.id}`);
     }
   });
+
+  test('offers backups under a waitlisted place, and adding one seats me', async ({ page, request }, testInfo) => {
+    const { user, day } = await laneFor('agenda.backup', testInfo);
+    const put = (s) => request.put(`${API}/users/${user}/reservations/${s.id}`);
+    const held = [];
+    try {
+      const queue = (await bookableFor(request, user, day)).find((s) => s.isFull);
+      expect(queue, 'no full session on the lane day').toBeTruthy();
+      expect((await (await put(queue)).json()).status).toBe('waitlisted');
+      held.push(queue);
+      // a seat clear of the queued slot, so the seated row has no backups
+      const seat = (await bookableFor(request, user, day)).find((s) => !s.isFull && s.seatsLeft > 3);
+      expect((await (await put(seat)).json()).status).toBe('confirmed');
+      held.push(seat);
+
+      // pinned before the slot, so the queued place has not ended
+      await visit(page, '/my-agenda', { as: user, at: `${day}T07:00` });
+      const row = (s) => page.getByTestId('agenda-session').filter({ hasText: s.title });
+      await expect(row(queue).getByTestId('agenda-status')).toHaveText('Waitlisted');
+      const backups = page.getByTestId('agenda-backups');
+      await expect(backups).toHaveCount(1);
+      const n = await backups.getByTestId('agenda-backup').count();
+      expect(n).toBeGreaterThan(0);
+      expect(n).toBeLessThanOrEqual(3);
+      await expect(row(seat).getByTestId('agenda-backups')).toHaveCount(0);
+      await shotForPR(page, 'backup sessions under a waitlisted place');
+
+      const first = backups.getByTestId('agenda-backup').first();
+      const title = await first.locator('span.font-medium').first().textContent();
+      await first.getByTestId('agenda-backup-add').click();
+      const added = page.getByTestId('agenda-session').filter({ hasText: title });
+      await expect(added.getByTestId('agenda-status')).toHaveText('Seated');
+      const mine = await (await request.get(`${API}/users/${user}/schedule`)).json();
+      const got = mine.days.flatMap((d) => d.sessions).find((s) => s.title === title);
+      held.push(got);
+    } finally {
+      for (const s of held) await request.delete(`${API}/users/${user}/reservations/${s.id}`);
+    }
+  });
 });

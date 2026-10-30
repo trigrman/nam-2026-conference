@@ -83,10 +83,11 @@ export function todayFor(userId, { day, time = '00:00' }) {
 }
 
 /** Ranked by how much a session looks like the things they already chose. */
-function suggestionsFor(userId, day, slot) {
+function suggestionsFor(userId, day, slot, exclude = new Set()) {
   const taste = new Set(myTopics.all(userId).map((t) => t.slug));
 
   return hydrateSessions(openInSlot.all(day, slot))
+    .filter((s) => !exclude.has(s.id))
     .map((s) => ({ ...s, affinity: s.tags.filter((t) => t.kind === 'topic' && taste.has(t.slug)).length }))
     .sort((a, b) => b.affinity - a.affinity || b.avgRating - a.avgRating)
     .slice(0, SUGGESTION_COUNT);
@@ -104,7 +105,11 @@ export function scheduleFor(userId) {
       reservation: status.get(s.id) ?? null,
       checkedIn: checkedIn.has(s.id),
       myStars: stars.get(s.id) ?? null,
-    }));
+    }))
+    // A queued place may never come good: offer open sessions in its slot, never one already held.
+    .map((s) => (s.reservation === 'waitlisted'
+      ? { ...s, backups: suggestionsFor(userId, s.day, s.startsAt, new Set(status.keys())) }
+      : s));
 
   const byDay = new Map();
   for (const s of sessions) {
