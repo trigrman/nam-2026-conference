@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { agendaDays, hoursLabel, promotedSince, statusMap } from '../../src/lib/agendaDays.js';
+import { agendaDays, hoursLabel, promotedSince, statusMap, travelWarnings } from '../../src/lib/agendaDays.js';
 
 const s = (id, startsAt, endsAt) => ({ id, startsAt, endsAt });
 const payload = [
@@ -67,5 +67,36 @@ describe('promotedSince', () => {
     const next = statusMap(days);
     assert.deepEqual(next, { 1: 'confirmed', 2: 'waitlisted' });
     assert.deepEqual(promotedSince(next, now), []);
+  });
+});
+
+describe('travelWarnings', () => {
+  const travel = [
+    { fromVenueId: 1, toVenueId: 2, mode: 'Shuttle', minutes: 25, costUsd: 0 },
+    { fromVenueId: 1, toVenueId: 2, mode: 'Rideshare', minutes: 16, costUsd: 18 },
+  ];
+  const at = (id, startsAt, endsAt, venueId, walkMinutes = 2) =>
+    ({ id, startsAt, endsAt, venue: { id: venueId, name: `V${venueId}` }, room: { walkMinutes } });
+
+  test('a short gap across venues warns on the earlier session, with the trip and the gap', () => {
+    const out = travelWarnings([at(1, '09:00', '10:00', 1), at(2, '10:15', '11:00', 2)], travel);
+    assert.deepEqual(Object.keys(out), ['1']);
+    assert.equal(out[1].fastest.total, 18);
+    assert.equal(out[1].gapMinutes, 15);
+  });
+
+  test('the same venue, or enough time to get there, warns about nothing', () => {
+    assert.deepEqual(travelWarnings([at(1, '09:00', '10:00', 1), at(2, '10:15', '11:00', 1)], travel), {});
+    assert.deepEqual(travelWarnings([at(1, '09:00', '10:00', 1), at(2, '11:00', '12:00', 2)], travel), {});
+  });
+
+  test('only the fastest mode matters: a gap the rideshare fits is not a warning', () => {
+    assert.deepEqual(travelWarnings([at(1, '09:00', '10:00', 1), at(2, '10:20', '11:00', 2)], travel), {});
+  });
+
+  test('pairs are taken in time order, and a lone session has no pair', () => {
+    const out = travelWarnings([at(2, '10:15', '11:00', 2), at(1, '09:00', '10:00', 1)], travel);
+    assert.deepEqual(Object.keys(out), ['1']);
+    assert.deepEqual(travelWarnings([at(1, '09:00', '10:00', 1)], travel), {});
   });
 });

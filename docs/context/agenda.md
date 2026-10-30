@@ -60,7 +60,9 @@ empty days), or a removed session stays on screen until a refresh. Per-session
 attendance for a row is `SessionCard variant="row"`'s `attendance` prop
 (`{ ended: hasEnded(s, clock), checkedIn, myStars }`, schedule doc); booked hours
 under a waitlist caveat fit `Stat`'s `note` (ui doc); a cross-town hop between two
-seats is `travel.js:assessTravel` (venues doc); export is `api.agendaCalendarUrl`.
+seats is flagged by `agendaDays.js:travelWarnings(confirmedSessions, travel)` (calls
+`assessTravel`, venues doc; keyed by the earlier session, only when `impossible`) and
+rendered as `agenda-travel-warning` under that row; export is `api.agendaCalendarUrl`.
 
 **`GET /api/users/:id/today?day=&time=`** → `users.js` checks the user exists (404)
 and `day` is present (400), then `agenda.js:todayFor(userId, { day, time })`.

@@ -52,9 +52,9 @@ with different minutes; never assume symmetry.
   sessions (needs `.venue.id` and `to.room.walkMinutes`). Returns `null` if same
   venue or no route. Otherwise `{ gapMinutes, walk, options, fastest, free,
   impossible, freeTooSlow }`; each option gets `total = minutes + walk` and
-  `fits`. Excludes `Walk`. `free` = the first `costUsd === 0` option. No UI
-  calls it yet — it is there for an agenda view that warns about a cross-town
-  hop between two booked sessions; `tests/unit/travel.test.js` covers it.
+  `fits`. Excludes `Walk`. `free` = the first `costUsd === 0` option. My Agenda calls it
+  through `agendaDays.js:travelWarnings` to warn about a cross-town hop between two
+  seated sessions; `tests/unit/travel.test.js` covers it.
 
 **`VenuesPage`** — URL params `venue` (id; defaults to first = primary) and
 `day` (defaults to `clock.day`). Unlike other pages, `set()` never deletes a

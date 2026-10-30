@@ -119,4 +119,48 @@ test.describe('My Agenda', () => {
       await request.delete(`${API}/users/${user}/reservations/${b.id}`);
     }
   });
+
+  test('warns between back-to-back sessions at venues too far apart, and only then', async ({ page, request }, testInfo) => {
+    const { user, day } = await laneFor('agenda.travel', testInfo);
+    const open = (await bookableFor(request, user, day)).filter((s) => s.seatsLeft > 0 && !s.isFull);
+    const mins = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+    // consecutive slots: the next session starting after `s` ends, 30 minutes on
+    const next = (s, pred) => open.find((t) => t.startsAt > s.endsAt && mins(t.startsAt) - mins(s.endsAt) <= 30 && pred(t));
+    const far = open.map((a) => [a, next(a, (t) => t.venue.id !== a.venue.id && t.room.walkMinutes >= 13)]).find(([, b]) => b);
+    expect(far, 'no cross-venue pair in consecutive slots').toBeTruthy();
+    const [a, b] = far;
+    const c = next(a, (t) => t.venue.id === a.venue.id && t.id !== b.id && t.startsAt === b.startsAt);
+    expect(c, 'no same-venue session in the same later slot').toBeTruthy();
+
+    const put = (s) => request.put(`${API}/users/${user}/reservations/${s.id}`);
+    try {
+      expect((await (await put(a)).json()).status).toBe('confirmed');
+      expect((await (await put(b)).json()).status).toBe('confirmed');
+
+      // a moment before anything has started: the warning is about the plan, not the clock
+      await visit(page, '/my-agenda', { as: user, at: `${day}T07:00` });
+      // the seeded plan may carry its own warnings: look only at the one directly under `a`
+      const warning = page.getByTestId('agenda-session').filter({ hasText: a.title })
+        .locator('xpath=following-sibling::*[1][@data-testid="agenda-travel-warning"]');
+      const gap = mins(b.startsAt) - mins(a.endsAt);
+      await expect(warning).toHaveCount(1);
+      await expect(warning).toContainText(`${a.venue.name} to ${b.venue.name} takes`);
+      await expect(warning).toContainText(`you have ${gap}`);
+      expect(Number(/takes (\d+) min/.exec(await warning.textContent())[1])).toBeGreaterThan(gap);
+      await shotForPR(page, 'travel warning between two far-apart sessions');
+
+      // removing one of the pair takes the warning with it, no reload
+      await page.getByTestId('agenda-session').filter({ hasText: b.title }).getByTestId('agenda-remove').click();
+      await expect(page.getByTestId('agenda-session').filter({ hasText: b.title })).toHaveCount(0);
+      await expect(warning).toHaveCount(0);
+
+      // the same gap at the first session's own venue: nothing to warn about
+      expect((await (await put(c)).json()).status).toBe('confirmed');
+      await page.reload();
+      await expect(page.getByTestId('agenda-session').filter({ hasText: c.title })).toBeVisible();
+      await expect(warning).toHaveCount(0);
+    } finally {
+      for (const s of [a, b, c]) await request.delete(`${API}/users/${user}/reservations/${s.id}`);
+    }
+  });
 });
