@@ -35,6 +35,7 @@ before(async () => {
     venue: boot.venues[0].id,
     room: boot.rooms[0].id,
     track: boot.tracks[0].slug,
+    track2: boot.tracks[1].slug,
     topic: boot.tags.find((t) => t.kind === 'topic').slug,
     level: boot.levels[0].name,
     format: boot.formats[0].name,
@@ -72,6 +73,7 @@ function filtered() {
   return [
     `/sessions?day=${days[1]}`,
     `/sessions?trackSlug=${ids.track}`,
+    `/sessions?trackSlug=${ids.track},${ids.track2}`,
     `/sessions?tagSlug=${ids.topic}`,
     `/sessions?venueId=${ids.venue}`,
     `/sessions?roomId=${ids.room}`,
@@ -121,6 +123,23 @@ describe('Every endpoint answers', () => {
       assert.ok(Array.isArray(res.body), `GET ${path} did not return a list`);
       assert.ok(res.body.length <= all, `GET ${path} returned more than the unfiltered list`);
     }
+  });
+
+  test('trackSlug takes several tracks: the union of each, and one slug is unchanged', async () => {
+    const [a, b] = [ids.track, ids.track2];
+    const idsOf = (list) => list.map((s) => s.id).sort();
+    const onlyA = await api.json(`/sessions?trackSlug=${a}`);
+    const onlyB = await api.json(`/sessions?trackSlug=${b}`);
+    const both = await api.json(`/sessions?trackSlug=${a},${b}`);
+    assert.ok(onlyA.length > 0 && onlyB.length > 0);
+    assert.deepEqual(idsOf(both), idsOf([...onlyA, ...onlyB]));
+    assert.ok(both.length > onlyA.length && both.length > onlyB.length);
+    assert.ok(both.every((s) => [a, b].includes(s.track.slug)));
+    // empty parts are ignored
+    assert.deepEqual(idsOf(await api.json(`/sessions?trackSlug=${a},,${b},`)), idsOf(both));
+    // a single slug equals filtering the full list
+    const all = await api.json('/sessions');
+    assert.deepEqual(idsOf(onlyA), idsOf(all.filter((s) => s.track.slug === a)));
   });
 
   test('the health check reports ok and the session count', async () => {
