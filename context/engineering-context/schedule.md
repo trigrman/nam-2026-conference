@@ -11,6 +11,7 @@ files:
   - server/routes/sessions.js
 tests:
   - tests/schedule.spec.js
+  - tests/api/tracks-filter.test.js
   - tests/session.spec.js
 related: [seats, attendance, agenda, venues, speakers, ui, clock]
 ---
@@ -29,7 +30,7 @@ and a bound `?` to `args`:
 | param | clause |
 | --- | --- |
 | `day` | `s.day = ?` |
-| `trackSlug` | `t.slug = ?` |
+| `trackSlug` | `t.slug IN (?, …)` — one slug or a comma list |
 | `venueId` / `roomId` | `v.id = ?` / `r.id = ?` |
 | `level` / `format` | `s.level = ?` / `s.format = ?` |
 | `q` | `LIKE %q%` on title, abstract, subtitle, or any speaker name (`EXISTS`) |
@@ -52,7 +53,7 @@ lists are plain `toSession` — no speakers/tags. **`/:id.ics`** is registered
 
 **`SchedulePage`** reads everything from `useSearchParams`:
 `day` (default `clock.day` if it is a conference day, else `days[0].date`),
-`track`, `venue` (venue id), `level`, `format`, `tag` (topic slug), `q`, `view`.
+`track` (comma list; the pills are `aria-pressed` toggles, **All** clears), `venue` (venue id), `level`, `format`, `tag` (topic slug), `q`, `view`.
 Page keys map to API keys in the `useFetch` call (`track→trackSlug`,
 `venue→venueId`, `tag→tagSlug`). `set(key, value)` deletes the key for `'all'`/empty
 and writes with `{ replace: true }`; `clearAll` keeps `day` and an explicit `view`.
