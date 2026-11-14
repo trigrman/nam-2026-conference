@@ -233,3 +233,55 @@ test.describe('Ended sessions', () => {
     for (const l of ['Venue', 'Level', 'Format', 'Topic']) await expect(page.getByLabel(l)).toBeVisible();
   });
 });
+
+test.describe('Schedule track filter', () => {
+  test('several tracks can be on at once, survive a reload, and All clears them', async ({ page, request }) => {
+    const boot = await (await request.get(`${API}/bootstrap`)).json();
+    const day = boot.days[0].date;
+    const counts = {};
+    for (const t of boot.tracks) {
+      counts[t.slug] = (await (await request.get(`${API}/sessions?day=${day}&trackSlug=${t.slug}`)).json()).length;
+    }
+    const [a, b] = boot.tracks.filter((t) => counts[t.slug] > 0);
+    const countFor = async (slugs) =>
+      (await (await request.get(`${API}/sessions?day=${day}&trackSlug=${slugs.join(',')}`)).json()).length;
+    const total = (await (await request.get(`${API}/sessions?day=${day}`)).json()).length;
+
+    await visit(page, `/schedule?view=list&day=${day}`);
+    await waitForResults(page);
+    const filters = page.getByRole('button', { name: /^Filters/ });
+    if (await filters.isVisible()) await filters.click();
+
+    const pill = (t) => page.getByRole('button', { name: t.shortName ?? t.name, exact: true });
+    const all = page.getByRole('button', { name: 'All', exact: true });
+    const count = page.getByTestId('result-count');
+    const n = (c) => new RegExp(`^${c} session`);
+
+    await expect(all).toHaveAttribute('aria-pressed', 'true');
+    await expect(pill(a)).toHaveAttribute('aria-pressed', 'false');
+
+    await pill(a).click();
+    await pill(b).click();
+    await expect(pill(a)).toHaveAttribute('aria-pressed', 'true');
+    await expect(pill(b)).toHaveAttribute('aria-pressed', 'true');
+    await expect(all).toHaveAttribute('aria-pressed', 'false');
+    await expect(count).toContainText(n(await countFor([a.slug, b.slug])));
+    await shotForPR(page, 'two tracks selected');
+
+    await page.reload();
+    await waitForResults(page);
+    if (await filters.isVisible()) await filters.click();
+    await expect(pill(a)).toHaveAttribute('aria-pressed', 'true');
+    await expect(pill(b)).toHaveAttribute('aria-pressed', 'true');
+    await expect(count).toContainText(n(await countFor([a.slug, b.slug])));
+
+    await pill(b).click();
+    await expect(pill(b)).toHaveAttribute('aria-pressed', 'false');
+    await expect(count).toContainText(n(counts[a.slug]));
+
+    await all.click();
+    await expect(page).not.toHaveURL(/track=/);
+    await expect(pill(a)).toHaveAttribute('aria-pressed', 'false');
+    await expect(count).toContainText(n(total));
+  });
+});
