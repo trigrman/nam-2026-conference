@@ -33,6 +33,8 @@ export function SchedulePage() {
     tag: params.get('tag') ?? ALL,
     q: params.get('q') ?? '',
   };
+  // filters.track stays the raw comma list (?track=a,b); the pills toggle slugs in it
+  const selectedTracks = filters.track === ALL ? [] : filters.track.split(',').filter(Boolean);
   // A horizontally scrolling matrix is a poor default on a phone, so the grid
   // is only the default where there is room for it. An explicit ?view= wins.
   const wide = useMediaQuery('(min-width: 1024px)');
@@ -162,16 +164,17 @@ export function SchedulePage() {
       <div>
         <h3 className="sr-only text-[11px] font-semibold uppercase tracking-wider text-faint lg:not-sr-only lg:mb-2 lg:block">Track</h3>
         <div className="hide-scrollbar flex flex-nowrap gap-1.5 overflow-x-auto lg:flex-wrap">
-          <button type="button" onClick={() => set('track', ALL)}
+          <button type="button" onClick={() => set('track', ALL)} aria-pressed={selectedTracks.length === 0}
             className={cx('shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
-              filters.track === ALL ? 'border-white/25 bg-overlay text-ink' : 'border-hairline text-muted hover:text-ink')}>
+              selectedTracks.length === 0 ? 'border-white/25 bg-overlay text-ink' : 'border-hairline text-muted hover:text-ink')}>
             All
           </button>
           {tracks.map((t) => {
             const a = accent(t.color);
-            const active = filters.track === t.slug;
+            const active = selectedTracks.includes(t.slug);
             return (
-              <button key={t.id} type="button" onClick={() => set('track', active ? ALL : t.slug)}
+              <button key={t.id} type="button" aria-pressed={active}
+                onClick={() => set('track', (active ? selectedTracks.filter((s) => s !== t.slug) : [...selectedTracks, t.slug]).join(','))}
                 className={cx('inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                   active ? a.chip : 'border-hairline text-muted hover:text-ink')}>
                 <span className={cx('size-1.5 rounded-full', a.dot)} />
